@@ -171,8 +171,12 @@ class BaseAlgo(ABC):
             # Do one agent-environment interaction
 
             preprocessed_obs = self.preprocess_obss(self.obs, device=self.device)
+            # self.obs: 长度为16的obs，代表16个并行环境的obs
+            # preprocessed_obs：包含image和text两个key，image是16*7*7*3，16个并行环境，7行7列3通道，text是16*10
             with torch.no_grad():
                 if self.acmodel.recurrent:
+                    # self.acmodel.use_text = False, 没有用text信息
+                    # self.acmodel.use_memory = False， 没有用memory信息
                     dist, value, memory, extr_value = self.acmodel(preprocessed_obs, self.memory * self.mask.unsqueeze(1), get_extrinsic_value = True)
                 else:
                     dist, value, _ , extr_value = self.acmodel(preprocessed_obs,get_extrinsic_value = True)
@@ -186,7 +190,7 @@ class BaseAlgo(ABC):
                     self.agent_pos_visits[tuple(env.agent_pos)] = 0
                 self.agent_pos_visits[tuple(env.agent_pos)] += 0.0001
 
-
+            # 只记录了s,记录了s之后，self.obs就变成了s‘
             self.obss[i] = self.obs
             self.obs = obs
             if self.acmodel.recurrent:
