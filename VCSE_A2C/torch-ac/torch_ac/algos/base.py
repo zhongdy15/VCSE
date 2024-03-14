@@ -118,6 +118,7 @@ class BaseAlgo(ABC):
 
         self.obs = self.env.reset()
         self.obss = [None]*(shape[0])
+        self.next_obss = [None]*(shape[0])
         self.agent_loc = [None]*(shape[0])
         if self.acmodel.recurrent:
             self.memory = torch.zeros(shape[1], self.acmodel.memory_size, device=self.device)
@@ -193,6 +194,8 @@ class BaseAlgo(ABC):
             # 只记录了s,记录了s之后，self.obs就变成了s‘
             self.obss[i] = self.obs
             self.obs = obs
+            # 记录s'
+            self.next_obss[i] = self.obs
             if self.acmodel.recurrent:
                 self.memories[i] = self.memory
                 self.memory = memory
@@ -262,6 +265,10 @@ class BaseAlgo(ABC):
         exps.obs = [self.obss[i][j]
                     for j in range(self.num_procs)
                     for i in range(self.num_frames_per_proc)]
+
+        exps.next_obs = [self.next_obss[i][j]
+                    for j in range(self.num_procs)
+                    for i in range(self.num_frames_per_proc)]
         
         if self.acmodel.recurrent:
             # T x P x D -> P x T x D -> (P * T) x D
@@ -283,6 +290,7 @@ class BaseAlgo(ABC):
         # Preprocess experiences
 
         exps.obs = self.preprocess_obss(exps.obs, device=self.device)
+        exps.next_obs = self.preprocess_obss(exps.next_obs, device=self.device)
 
         # Log some values
 
