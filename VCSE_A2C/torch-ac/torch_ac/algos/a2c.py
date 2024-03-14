@@ -87,13 +87,39 @@ class A2CAlgo(BaseAlgo):
                         else:
                             tgt_feats = torch.tensor(self.replay_buffer[:self.idx], device=self.device)
                     s_ent = self.compute_state_entropy(src_feats[:,:,0,0], tgt_feats, average_entropy=True)[:,0]
-                    s_ent = torch.log(s_ent + 1.0)
+                    # s_ent = torch.log(s_ent + 1.0)
+
+                    # calculate ssprime_ent
+                    sb_next_obs = sb.next_obs.image.transpose(1, 3).transpose(2, 3)
+                    src_nextobs_feats = self.random_encoder(sb_next_obs)
+
+                    src_ssprime_feats = torch.cat((src_feats, src_nextobs_feats), dim=1)
+
+                    if self.use_batch:
+                        tgt_ssprime_feats = src_ssprime_feats.clone()[:, :, 0, 0]
+                    else:
+                        if self.full:
+                            tgt_ssprime_feats = torch.tensor(self.ssprime_replay_buffer, device=self.device)
+                        else:
+                            tgt_ssprime_feats = torch.tensor(self.ssprime_replay_buffer[:self.idx], device=self.device)
+                    ssprime_ent = self.compute_state_entropy(src_ssprime_feats[:, :, 0, 0], tgt_ssprime_feats, average_entropy=True)[:, 0]
+
+                    sprime_condition_s_ent = ssprime_ent**2 / (s_ent + 1e-8)
+                    sprime_condition_s_ent = torch.log(sprime_condition_s_ent + 1.0)
+
                     # normalize s_ent
-                    self.s_ent_stats.update(s_ent)
-                    norm_state_entropy = s_ent / self.s_ent_stats.std
-                    s_ent = norm_state_entropy
-                    sb_advantage = sb.advantage + self.beta * s_ent
-                    sb_returnn = sb.returnn + self.beta * s_ent
+                    self.s_ent_stats.update(sprime_condition_s_ent)
+                    norm_state_entropy = sprime_condition_s_ent / self.s_ent_stats.std
+                    sprime_condition_s_ent = norm_state_entropy
+                    sb_advantage = sb.advantage + self.beta * sprime_condition_s_ent
+                    sb_returnn = sb.returnn + self.beta * sprime_condition_s_ent
+
+                    # # normalize s_ent
+                    # self.s_ent_stats.update(s_ent)
+                    # norm_state_entropy = s_ent / self.s_ent_stats.std
+                    # s_ent = norm_state_entropy
+                    # sb_advantage = sb.advantage + self.beta * s_ent
+                    # sb_returnn = sb.returnn + self.beta * s_ent
                    
             else:
                 sb_advantage = sb.advantage
