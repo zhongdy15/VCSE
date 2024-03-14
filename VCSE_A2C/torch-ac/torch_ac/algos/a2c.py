@@ -78,6 +78,7 @@ class A2CAlgo(BaseAlgo):
                     sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
                     # compute state entropy with random_encoder
                     src_feats = self.random_encoder(sb_obs)
+                    # src_feats: torch.Size([128, 64, 1, 1]),encoder的size是64
                     if self.use_batch:
                         tgt_feats = src_feats.clone()[:,:,0,0]
                     else:

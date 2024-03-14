@@ -336,6 +336,9 @@ class BaseAlgo(ABC):
     def compute_state_entropy(self, src_feats, tgt_feats, average_entropy=False):
         with torch.no_grad():
             dists = []
+            # for test
+            # print("tgt_feats_length:"+str(len(tgt_feats)))
+            # tgt_feats 最大只有10000
             for idx in range(len(tgt_feats) // 10000 + 1):
                 start = idx * 10000
                 end = (idx + 1) * 10000
@@ -345,6 +348,7 @@ class BaseAlgo(ABC):
                 dists.append(dist)
 
             dists = torch.cat(dists, dim=1)
+            # 这儿计算出来的是src_feats * tgt_feats的矩阵，每一个代表一个距离
             knn_dists = 0.0
             if average_entropy:
                 for k in range(5):

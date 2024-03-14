@@ -155,6 +155,7 @@ num_frames = status["num_frames"]
 update = status["update"]
 start_time = time.time()
 
+# 这里限制了replay_buffer的长度，tgt_feats最多只有10000个
 algo.replay_buffer = np.zeros((10000, 64))
 algo.idx = 0
 algo.full = False
