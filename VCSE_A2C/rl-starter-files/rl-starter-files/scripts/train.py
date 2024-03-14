@@ -157,6 +157,8 @@ start_time = time.time()
 
 # 这里限制了replay_buffer的长度，tgt_feats最多只有10000个
 algo.replay_buffer = np.zeros((10000, 64))
+algo.ssprime_replay_buffer = np.zeros((10000, 128))
+
 algo.idx = 0
 algo.full = False
 
@@ -172,6 +174,13 @@ while num_frames < args.frames:
         for i in range(len(exps.obs)):
             # store low-dimensional features from random encoder
             algo.replay_buffer[algo.idx] = algo.random_encoder(exps.obs[i].image.unsqueeze(0).transpose(1, 3).transpose(2, 3))[0,:,0,0].detach().cpu().numpy()
+
+            encode_s = algo.random_encoder(exps.obs[i].image.unsqueeze(0).transpose(1, 3).transpose(2, 3))[0,:,0,0].detach().cpu().numpy()
+            encode_next_s = algo.random_encoder(exps.next_obs[i].image.unsqueeze(0).transpose(1, 3).transpose(2, 3))[0,:,0,0].detach().cpu().numpy()
+            encode_ssprime = np.concatenate((encode_s,encode_next_s))
+
+            algo.ssprime_replay_buffer[algo.idx] = encode_ssprime
+
             algo.idx = (algo.idx + 1) % algo.replay_buffer.shape[0]
             algo.full = algo.full or algo.idx == 0
 
