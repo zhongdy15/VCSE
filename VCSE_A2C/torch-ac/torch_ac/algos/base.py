@@ -388,7 +388,48 @@ class BaseAlgo(ABC):
         modified_constant = torch.pow(torch.tensor(tgt_feats.shape[0]),torch.tensor(1.0/tgt_feats.shape[1]))
         state_entropy  = state_entropy * modified_constant
         return state_entropy.unsqueeze(1)
-    
+
+    def compute_state_condition_sprime_entropy(self, src_feats, tgt_feats, src_nextobs_feats, tgt_nextobs_feats, average_entropy=False):
+        with torch.no_grad():
+            dists = []
+            state_dists = []
+            nextobs_dists = []
+            ds = src_feats.size(1)
+            for idx in range(len(tgt_feats) // 10000 + 1):
+                start = idx * 10000
+                end = (idx + 1) * 10000
+                # 这儿计算出来的是src_feats * tgt_feats的矩阵，每一个代表一个距离
+                state_dist = torch.norm(
+                    src_feats[:, None, :] - tgt_feats[None, start:end, :], dim=-1, p=2
+                )
+                state_dists.append(state_dist)
+                # 这儿计算出来的是src_feats * tgt_feats的矩阵，每一个代表一个距离
+                nextobs_dist = torch.norm(
+                    src_nextobs_feats[:, None, :] - tgt_nextobs_feats[None, start:end, :], dim=-1, p=2
+                )
+                nextobs_dists.append(nextobs_dist)
+                dist = torch.max(torch.cat((state_dist.unsqueeze(-1), nextobs_dist.unsqueeze(-1)), dim=-1), dim=-1)[0]
+                dists.append(dist)
+
+            dists = torch.cat(dists, dim=1)
+            nextobs_dists = torch.cat(nextobs_dists, dim=1)
+            state_dists = torch.cat(state_dists, dim=1)
+            eps = 0.0
+            if average_entropy:
+                for k in range(5):
+                    eps += torch.kthvalue(dists, k + 1, dim=1).values
+                eps /= 5
+            else:
+                eps = torch.kthvalue(dists, k=self.k + 1, dim=1).values
+            # eps 代表b1个点每个的kth距离
+            eps = eps.reshape(-1, 1)  # (b1, 1)
+            # nextobs_dists = nextobs_dists < eps
+            state_dists = state_dists < eps
+            # n_sprime = torch.sum(nextobs_dists, dim=1, keepdim=True)  # (b1,1)
+            n_s = torch.sum(state_dists, dim=1, keepdim=True)  # (b1,1)
+            reward = torch.digamma(n_s + 1) / ds + torch.log(eps * 2 + 0.00001)
+        return reward
+
     def compute_value_condition_state_entropy(self, src_feats, tgt_feats, value, average_entropy=False):
         with torch.no_grad():
             dists = []
