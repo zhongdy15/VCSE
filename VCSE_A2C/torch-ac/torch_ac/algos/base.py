@@ -370,10 +370,12 @@ class BaseAlgo(ABC):
             for idx in range(len(tgt_feats) // 10000 + 1):
                 start = idx * 10000
                 end = (idx + 1) * 10000
+                # 这儿计算出来的是src_feats * tgt_feats的矩阵，每一个代表一个距离
                 state_dist = torch.norm(
                     src_feats[:, None, :] - tgt_feats[None, start:end, :], dim=-1, p=2
                 )
                 state_dists.append(state_dist)
+                # 这儿计算出来的是src_feats * tgt_feats的矩阵，每一个代表一个距离
                 value_dist = torch.norm(
                     value[:, None, :] - value[None, start:end, :], dim=-1, p=2
                 )
@@ -391,7 +393,7 @@ class BaseAlgo(ABC):
                 eps /= 5
             else:
                 eps = torch.kthvalue(dists, k=self.k + 1, dim=1).values
-                
+            #eps 代表b1个点每个的kth距离
             eps = eps.reshape(-1, 1) # (b1, 1)
             value_dists = value_dists < eps
             state_dists = state_dists <= eps
