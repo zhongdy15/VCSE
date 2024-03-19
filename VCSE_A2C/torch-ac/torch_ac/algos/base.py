@@ -361,6 +361,32 @@ class BaseAlgo(ABC):
             state_entropy = knn_dists
         return state_entropy.unsqueeze(1)
 
+    def compute_state_entropy(self, src_feats, tgt_feats, average_entropy=False):
+        with torch.no_grad():
+            dists = []
+            # for test
+            # print("tgt_feats_length:"+str(len(tgt_feats)))
+            # tgt_feats 最大只有10000
+            for idx in range(len(tgt_feats) // 10000 + 1):
+                start = idx * 10000
+                end = (idx + 1) * 10000
+                dist = torch.norm(
+                    src_feats[:, None, :] - tgt_feats[None, start:end, :], dim=-1, p=2
+                )
+                dists.append(dist)
+
+            dists = torch.cat(dists, dim=1)
+            # 这儿计算出来的是src_feats * tgt_feats的矩阵，每一个代表一个距离
+            knn_dists = 0.0
+            if average_entropy:
+                for k in range(5):
+                    knn_dists += torch.kthvalue(dists, k + 1, dim=1).values
+                knn_dists /= 5
+            else:
+                knn_dists = torch.kthvalue(dists, k=self.k + 1, dim=1).values
+            state_entropy = knn_dists
+        return state_entropy.unsqueeze(1)
+    
     def compute_value_condition_state_entropy(self, src_feats, tgt_feats, value, average_entropy=False):
         with torch.no_grad():
             dists = []
