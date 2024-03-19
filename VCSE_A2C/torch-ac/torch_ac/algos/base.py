@@ -361,7 +361,7 @@ class BaseAlgo(ABC):
             state_entropy = knn_dists
         return state_entropy.unsqueeze(1)
 
-    def compute_state_entropy(self, src_feats, tgt_feats, average_entropy=False):
+    def compute_state_entropy_modified(self, src_feats, tgt_feats, average_entropy=False):
         with torch.no_grad():
             dists = []
             # for test
@@ -385,6 +385,8 @@ class BaseAlgo(ABC):
             else:
                 knn_dists = torch.kthvalue(dists, k=self.k + 1, dim=1).values
             state_entropy = knn_dists
+        modified_constant = torch.pow(torch.tensor(tgt_feats.shape[0]),torch.tensor(1.0/tgt_feats.shape[1]))
+        state_entropy  = state_entropy * modified_constant
         return state_entropy.unsqueeze(1)
     
     def compute_value_condition_state_entropy(self, src_feats, tgt_feats, value, average_entropy=False):
