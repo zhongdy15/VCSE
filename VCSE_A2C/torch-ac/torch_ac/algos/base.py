@@ -28,7 +28,7 @@ class BaseAlgo(ABC):
 
     def __init__(self, envs, acmodel, device, num_frames_per_proc, discount, lr, gae_lambda, entropy_coef,
                  value_loss_coef, max_grad_norm, recurrence, preprocess_obss, reshape_reward, 
-                 use_entropy_reward=False,use_value_condition=False,use_nextstate_entropy_reward=False):
+                 use_entropy_reward=False,use_value_condition=False,use_nextstate_entropy_reward=False,use_ksg=False):
         """
         Initializes a `BaseAlgo` instance.
 
@@ -65,6 +65,7 @@ class BaseAlgo(ABC):
         self.use_entropy_reward = use_entropy_reward
         self.use_value_condition = use_value_condition
         self.use_nextstate_entropy_reward = use_nextstate_entropy_reward
+        self.use_ksg = use_ksg
 
         # Store parameters
         self.envs = envs
