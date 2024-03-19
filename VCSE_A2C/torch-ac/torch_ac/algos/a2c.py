@@ -10,11 +10,11 @@ class A2CAlgo(BaseAlgo):
 
     def __init__(self, envs, acmodel, device=None, num_frames_per_proc=None, discount=0.99, lr=0.01, gae_lambda=0.95,
                  entropy_coef=0.01, value_loss_coef=0.5, max_grad_norm=0.5, recurrence=4,
-                 rmsprop_alpha=0.99, rmsprop_eps=1e-8, preprocess_obss=None, reshape_reward=None, use_entropy_reward=False, use_value_condition=False):
+                 rmsprop_alpha=0.99, rmsprop_eps=1e-8, preprocess_obss=None, reshape_reward=None, use_entropy_reward=False, use_value_condition=False, use_nextstate_entropy_reward=False):
         num_frames_per_proc = num_frames_per_proc or 8
 
         super().__init__(envs, acmodel, device, num_frames_per_proc, discount, lr, gae_lambda, entropy_coef,
-                         value_loss_coef, max_grad_norm, recurrence, preprocess_obss, reshape_reward, use_entropy_reward, use_value_condition)
+                         value_loss_coef, max_grad_norm, recurrence, preprocess_obss, reshape_reward, use_entropy_reward, use_value_condition, use_nextstate_entropy_reward)
 
         self.optimizer = torch.optim.RMSprop(self.acmodel.parameters(), lr,
                                             alpha=rmsprop_alpha, eps=rmsprop_eps)
@@ -74,7 +74,7 @@ class A2CAlgo(BaseAlgo):
 
                     sb_advantage = sb.advantage + self.beta * s_ent
                     sb_returnn = sb.returnn + self.beta * s_ent               
-                else :
+                elif self.use_nextstate_entropy_reward :
                     sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
                     # compute state entropy with random_encoder
                     src_feats = self.random_encoder(sb_obs)
@@ -120,7 +120,25 @@ class A2CAlgo(BaseAlgo):
                     # s_ent = norm_state_entropy
                     # sb_advantage = sb.advantage + self.beta * s_ent
                     # sb_returnn = sb.returnn + self.beta * s_ent
-                   
+                else:
+                    sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
+                    # compute state entropy with random_encoder
+                    src_feats = self.random_encoder(sb_obs)
+                    if self.use_batch:
+                        tgt_feats = src_feats.clone()[:, :, 0, 0]
+                    else:
+                        if self.full:
+                            tgt_feats = torch.tensor(self.replay_buffer, device=self.device)
+                        else:
+                            tgt_feats = torch.tensor(self.replay_buffer[:self.idx], device=self.device)
+                    s_ent = self.compute_state_entropy(src_feats[:, :, 0, 0], tgt_feats, average_entropy=True)[:, 0]
+                    s_ent = torch.log(s_ent + 1.0)
+                    # normalize s_ent
+                    self.s_ent_stats.update(s_ent)
+                    norm_state_entropy = s_ent / self.s_ent_stats.std
+                    s_ent = norm_state_entropy
+                    sb_advantage = sb.advantage + self.beta * s_ent
+                    sb_returnn = sb.returnn + self.beta * s_ent
             else:
                 sb_advantage = sb.advantage
                 sb_returnn = sb.returnn
