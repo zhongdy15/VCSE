@@ -77,51 +77,78 @@ class A2CAlgo(BaseAlgo):
                     sb_advantage = sb.advantage + self.beta * s_ent
                     sb_returnn = sb.returnn + self.beta * s_ent               
                 elif self.use_nextstate_entropy_reward :
-                    sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
-                    # compute state entropy with random_encoder
-                    src_feats = self.random_encoder(sb_obs)
-                    # src_feats: torch.Size([128, 64, 1, 1]),encoder的size是64
-                    if self.use_batch:
-                        tgt_feats = src_feats.clone()[:,:,0,0]
-                    else:
-                        if self.full:
-                            tgt_feats = torch.tensor(self.replay_buffer, device=self.device)
+                    if self.use_ksg:
+                        sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
+                        # compute value-conditional state entropy with random_encoder
+                        src_feats = self.random_encoder(sb_obs)
+                        if self.use_batch:
+                            tgt_feats = src_feats.clone()[:, :, 0, 0]
                         else:
-                            tgt_feats = torch.tensor(self.replay_buffer[:self.idx], device=self.device)
-                    s_ent = self.compute_state_entropy(src_feats[:,:,0,0], tgt_feats, average_entropy=True)[:,0]
-                    # s_ent = torch.log(s_ent + 1.0)
+                            if self.full:
+                                tgt_feats = torch.tensor(self.replay_buffer, device=self.device)
+                            else:
+                                tgt_feats = torch.tensor(self.replay_buffer[:self.idx], device=self.device)
+                        value_dist = value
+                        # NOTE: a trick to normalize values using the samples from mini-batch
+                        #       parameters will be initialized at every step
+                        #       but not a neat implementation
+                        self.layerNorm = torch.nn.LayerNorm(value_dist.size(0)).to(self.device)
+                        value_dist = value_dist.reshape(-1)
+                        value_dist = self.layerNorm(value_dist)
+                        value_dist = value_dist.reshape(-1, 1)
+                        s_ent = self.compute_value_condition_state_entropy(src_feats[:, :, 0, 0], tgt_feats, value_dist,
+                                                                           average_entropy=False)[:, 0]
+                        # we do not normalize intrinsic rewards, but update stats for logging purpose
+                        self.s_ent_stats.update(s_ent)
 
-                    # calculate ssprime_ent
-                    sb_next_obs = sb.next_obs.image.transpose(1, 3).transpose(2, 3)
-                    src_nextobs_feats = self.random_encoder(sb_next_obs)
-
-                    src_ssprime_feats = torch.cat((src_feats, src_nextobs_feats), dim=1)
-
-                    if self.use_batch:
-                        tgt_ssprime_feats = src_ssprime_feats.clone()[:, :, 0, 0]
+                        sb_advantage = sb.advantage + self.beta * s_ent
+                        sb_returnn = sb.returnn + self.beta * s_ent
                     else:
-                        if self.full:
-                            tgt_ssprime_feats = torch.tensor(self.ssprime_replay_buffer, device=self.device)
+                        sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
+                        # compute state entropy with random_encoder
+                        src_feats = self.random_encoder(sb_obs)
+                        # src_feats: torch.Size([128, 64, 1, 1]),encoder的size是64
+                        if self.use_batch:
+                            tgt_feats = src_feats.clone()[:,:,0,0]
                         else:
-                            tgt_ssprime_feats = torch.tensor(self.ssprime_replay_buffer[:self.idx], device=self.device)
-                    ssprime_ent = self.compute_state_entropy(src_ssprime_feats[:, :, 0, 0], tgt_ssprime_feats, average_entropy=True)[:, 0]
+                            if self.full:
+                                tgt_feats = torch.tensor(self.replay_buffer, device=self.device)
+                            else:
+                                tgt_feats = torch.tensor(self.replay_buffer[:self.idx], device=self.device)
+                        s_ent = self.compute_state_entropy(src_feats[:,:,0,0], tgt_feats, average_entropy=True)[:,0]
+                        # s_ent = torch.log(s_ent + 1.0)
 
-                    sprime_condition_s_ent = ssprime_ent**2 / (s_ent + 1e-8)
-                    sprime_condition_s_ent = torch.log(sprime_condition_s_ent + 1.0)
+                        # calculate ssprime_ent
+                        sb_next_obs = sb.next_obs.image.transpose(1, 3).transpose(2, 3)
+                        src_nextobs_feats = self.random_encoder(sb_next_obs)
 
-                    # normalize s_ent
-                    self.s_ent_stats.update(sprime_condition_s_ent)
-                    norm_state_entropy = sprime_condition_s_ent / self.s_ent_stats.std
-                    sprime_condition_s_ent = norm_state_entropy
-                    sb_advantage = sb.advantage + self.beta * sprime_condition_s_ent
-                    sb_returnn = sb.returnn + self.beta * sprime_condition_s_ent
+                        src_ssprime_feats = torch.cat((src_feats, src_nextobs_feats), dim=1)
 
-                    # # normalize s_ent
-                    # self.s_ent_stats.update(s_ent)
-                    # norm_state_entropy = s_ent / self.s_ent_stats.std
-                    # s_ent = norm_state_entropy
-                    # sb_advantage = sb.advantage + self.beta * s_ent
-                    # sb_returnn = sb.returnn + self.beta * s_ent
+                        if self.use_batch:
+                            tgt_ssprime_feats = src_ssprime_feats.clone()[:, :, 0, 0]
+                        else:
+                            if self.full:
+                                tgt_ssprime_feats = torch.tensor(self.ssprime_replay_buffer, device=self.device)
+                            else:
+                                tgt_ssprime_feats = torch.tensor(self.ssprime_replay_buffer[:self.idx], device=self.device)
+                        ssprime_ent = self.compute_state_entropy(src_ssprime_feats[:, :, 0, 0], tgt_ssprime_feats, average_entropy=True)[:, 0]
+
+                        sprime_condition_s_ent = ssprime_ent**2 / (s_ent + 1e-8)
+                        sprime_condition_s_ent = torch.log(sprime_condition_s_ent + 1.0)
+
+                        # normalize s_ent
+                        self.s_ent_stats.update(sprime_condition_s_ent)
+                        norm_state_entropy = sprime_condition_s_ent / self.s_ent_stats.std
+                        sprime_condition_s_ent = norm_state_entropy
+                        sb_advantage = sb.advantage + self.beta * sprime_condition_s_ent
+                        sb_returnn = sb.returnn + self.beta * sprime_condition_s_ent
+
+                        # # normalize s_ent
+                        # self.s_ent_stats.update(s_ent)
+                        # norm_state_entropy = s_ent / self.s_ent_stats.std
+                        # s_ent = norm_state_entropy
+                        # sb_advantage = sb.advantage + self.beta * s_ent
+                        # sb_returnn = sb.returnn + self.beta * s_ent
                 else:
                     sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
                     # compute state entropy with random_encoder
