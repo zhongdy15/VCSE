@@ -55,7 +55,31 @@ class A2CAlgo(BaseAlgo):
             if self.use_entropy_reward:
                 if self.use_value_condition :
                     if self.test_value_condition:
-                        pass
+                        sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
+                        # compute value-conditional state entropy with random_encoder
+                        src_feats = self.random_encoder(sb_obs)
+                        if self.use_batch:
+                            tgt_feats = src_feats.clone()[:, :, 0, 0]
+                        else:
+                            if self.full:
+                                tgt_feats = torch.tensor(self.replay_buffer, device=self.device)
+                            else:
+                                tgt_feats = torch.tensor(self.replay_buffer[:self.idx], device=self.device)
+                        value_dist = value
+                        # NOTE: a trick to normalize values using the samples from mini-batch
+                        #       parameters will be initialized at every step
+                        #       but not a neat implementation
+                        self.layerNorm = torch.nn.LayerNorm(value_dist.size(0)).to(self.device)
+                        value_dist = value_dist.reshape(-1)
+                        value_dist = self.layerNorm(value_dist)
+                        value_dist = value_dist.reshape(-1, 1)
+                        s_ent = self.compute_value_condition_state_entropy(src_feats[:, :, 0, 0], tgt_feats, value_dist,
+                                                                           average_entropy=False)[:, 0]
+                        # we do not normalize intrinsic rewards, but update stats for logging purpose
+                        self.s_ent_stats.update(s_ent)
+
+                        sb_advantage = sb.advantage + self.beta * s_ent
+                        sb_returnn = sb.returnn + self.beta * s_ent
                     else:
                         sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
                         # compute value-conditional state entropy with random_encoder
