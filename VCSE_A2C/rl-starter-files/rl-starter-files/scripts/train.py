@@ -66,6 +66,7 @@ parser.add_argument("--text", action="store_true", default=False,
 
 parser.add_argument("--use_entropy_reward", action="store_true", default=False)
 parser.add_argument("--use_value_condition", action="store_true", default=False)
+parser.add_argument("--test_value_condition", action="store_true", default=False)
 parser.add_argument("--use_nextstate_entropy_reward", action="store_true", default=False)
 parser.add_argument("--use_ksg", action="store_true", default=False)
 parser.add_argument("--beta", type=float, default=0.00001)
@@ -139,7 +140,11 @@ if args.algo == "a2c":
     algo = torch_ac.A2CAlgo(envs, acmodel, device, args.frames_per_proc, args.discount, args.lr, args.gae_lambda,
                             args.entropy_coef, args.value_loss_coef, args.max_grad_norm, args.recurrence,
                             args.optim_alpha, args.optim_eps, preprocess_obss, 
-                            use_entropy_reward=args.use_entropy_reward,use_value_condition=args.use_value_condition, use_nextstate_entropy_reward=args.use_nextstate_entropy_reward, use_ksg=args.use_ksg)
+                            use_entropy_reward=args.use_entropy_reward,
+                            use_value_condition=args.use_value_condition,
+                            use_nextstate_entropy_reward=args.use_nextstate_entropy_reward,
+                            use_ksg=args.use_ksg,
+                            test_value_condition=args.test_value_condition)
 elif args.algo == "ppo":
     algo = torch_ac.PPOAlgo(envs, acmodel, device, args.frames_per_proc, args.discount, args.lr, args.gae_lambda,
                             args.entropy_coef, args.value_loss_coef, args.max_grad_norm, args.recurrence,

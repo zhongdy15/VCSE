@@ -11,12 +11,14 @@ class A2CAlgo(BaseAlgo):
     def __init__(self, envs, acmodel, device=None, num_frames_per_proc=None, discount=0.99, lr=0.01, gae_lambda=0.95,
                  entropy_coef=0.01, value_loss_coef=0.5, max_grad_norm=0.5, recurrence=4,
                  rmsprop_alpha=0.99, rmsprop_eps=1e-8, preprocess_obss=None, reshape_reward=None,
-                 use_entropy_reward=False, use_value_condition=False, use_nextstate_entropy_reward=False, use_ksg=False):
+                 use_entropy_reward=False, use_value_condition=False, use_nextstate_entropy_reward=False, use_ksg=False,
+                 test_value_condition=False):
         num_frames_per_proc = num_frames_per_proc or 8
 
         super().__init__(envs, acmodel, device, num_frames_per_proc, discount, lr, gae_lambda, entropy_coef,
                          value_loss_coef, max_grad_norm, recurrence, preprocess_obss, reshape_reward,
-                         use_entropy_reward, use_value_condition, use_nextstate_entropy_reward, use_ksg)
+                         use_entropy_reward, use_value_condition, use_nextstate_entropy_reward, use_ksg,
+                         test_value_condition)
 
         self.optimizer = torch.optim.RMSprop(self.acmodel.parameters(), lr,
                                             alpha=rmsprop_alpha, eps=rmsprop_eps)
@@ -52,30 +54,33 @@ class A2CAlgo(BaseAlgo):
 
             if self.use_entropy_reward:
                 if self.use_value_condition :
-                    sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
-                    # compute value-conditional state entropy with random_encoder
-                    src_feats = self.random_encoder(sb_obs)
-                    if self.use_batch:
-                        tgt_feats = src_feats.clone()[:,:,0,0]
+                    if self.test_value_condition:
+                        pass
                     else:
-                        if self.full:
-                            tgt_feats = torch.tensor(self.replay_buffer, device=self.device)
+                        sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
+                        # compute value-conditional state entropy with random_encoder
+                        src_feats = self.random_encoder(sb_obs)
+                        if self.use_batch:
+                            tgt_feats = src_feats.clone()[:,:,0,0]
                         else:
-                            tgt_feats = torch.tensor(self.replay_buffer[:self.idx], device=self.device)    
-                    value_dist = value
-                    # NOTE: a trick to normalize values using the samples from mini-batch
-                    #       parameters will be initialized at every step
-                    #       but not a neat implementation
-                    self.layerNorm = torch.nn.LayerNorm(value_dist.size(0)).to(self.device)
-                    value_dist = value_dist.reshape(-1)
-                    value_dist = self.layerNorm(value_dist)
-                    value_dist = value_dist.reshape(-1,1)
-                    s_ent = self.compute_value_condition_state_entropy(src_feats[:,:,0,0], tgt_feats,value_dist, average_entropy=False)[:,0]
-                    # we do not normalize intrinsic rewards, but update stats for logging purpose
-                    self.s_ent_stats.update(s_ent)
+                            if self.full:
+                                tgt_feats = torch.tensor(self.replay_buffer, device=self.device)
+                            else:
+                                tgt_feats = torch.tensor(self.replay_buffer[:self.idx], device=self.device)
+                        value_dist = value
+                        # NOTE: a trick to normalize values using the samples from mini-batch
+                        #       parameters will be initialized at every step
+                        #       but not a neat implementation
+                        self.layerNorm = torch.nn.LayerNorm(value_dist.size(0)).to(self.device)
+                        value_dist = value_dist.reshape(-1)
+                        value_dist = self.layerNorm(value_dist)
+                        value_dist = value_dist.reshape(-1,1)
+                        s_ent = self.compute_value_condition_state_entropy(src_feats[:,:,0,0], tgt_feats,value_dist, average_entropy=False)[:,0]
+                        # we do not normalize intrinsic rewards, but update stats for logging purpose
+                        self.s_ent_stats.update(s_ent)
 
-                    sb_advantage = sb.advantage + self.beta * s_ent
-                    sb_returnn = sb.returnn + self.beta * s_ent               
+                        sb_advantage = sb.advantage + self.beta * s_ent
+                        sb_returnn = sb.returnn + self.beta * s_ent
                 elif self.use_nextstate_entropy_reward :
                     if self.use_ksg:
                         sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
