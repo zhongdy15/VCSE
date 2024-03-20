@@ -58,13 +58,24 @@ class A2CAlgo(BaseAlgo):
                         sb_obs = sb.obs.image.transpose(1, 3).transpose(2, 3)
                         # compute value-conditional state entropy with random_encoder
                         src_feats = self.random_encoder(sb_obs)
+
+                        sb_next_obs = sb.next_obs.image.transpose(1, 3).transpose(2, 3)
+                        src_nextobs_feats = self.random_encoder(sb_next_obs)
+                        src_ssprime_feats = torch.cat((src_feats, src_nextobs_feats), dim=1)
+
                         if self.use_batch:
                             tgt_feats = src_feats.clone()[:, :, 0, 0]
+                            tgt_nextobs_feats = src_nextobs_feats.clone()[:, :, 0, 0]
+                            tgt_ssprime_feats = src_ssprime_feats.clone()[:, :, 0, 0]
                         else:
                             if self.full:
-                                tgt_feats = torch.tensor(self.replay_buffer, device=self.device)
+                                tgt_ssprime_feats = torch.tensor(self.ssprime_replay_buffer, device=self.device)
+                                tgt_feats, tgt_nextobs_feats = torch.split(tgt_ssprime_feats, src_feats.size(1), dim=1)
                             else:
-                                tgt_feats = torch.tensor(self.replay_buffer[:self.idx], device=self.device)
+                                tgt_ssprime_feats = torch.tensor(self.ssprime_replay_buffer[:self.idx],
+                                                                 device=self.device)
+                                tgt_feats, tgt_nextobs_feats = torch.split(tgt_ssprime_feats, src_feats.size(1), dim=1)
+
                         value_dist = value
                         # NOTE: a trick to normalize values using the samples from mini-batch
                         #       parameters will be initialized at every step
@@ -73,7 +84,7 @@ class A2CAlgo(BaseAlgo):
                         value_dist = value_dist.reshape(-1)
                         value_dist = self.layerNorm(value_dist)
                         value_dist = value_dist.reshape(-1, 1)
-                        s_ent = self.compute_value_condition_state_entropy(src_feats[:, :, 0, 0], tgt_feats, value_dist,
+                        s_ent = self.compute_value_condition_state_entropy(src_nextobs_feats[:, :, 0, 0], tgt_nextobs_feats, value_dist,
                                                                            average_entropy=False)[:, 0]
                         # we do not normalize intrinsic rewards, but update stats for logging purpose
                         self.s_ent_stats.update(s_ent)
