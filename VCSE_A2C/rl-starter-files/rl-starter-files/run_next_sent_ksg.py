@@ -4,6 +4,14 @@ gpu_id_list = 6
 time_flag = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
 task_set = {"LavaGapS7", "Empty-16x16", "DoorKey-6x6", "DoorKey-8x8", "Unlock"}
 task_set = {"SimpleCrossingS9N1"}
+
+
+gpu_id_list = 3
+task_set_0320 = {"MultiRoom-N6","Fetch-8x8-N3","GoToObject-8x8-N2","GoToDoor-8x8",
+                 "PutNear-8x8-N3","LockedRoom","KeyCorridorS6R3","LavaCrossingS11N5",
+                 "DistShift2","RedBlueDoors-8x8"}
+task_set = {"GoToObject-8x8-N2","GoToDoor-8x8"}
+
 for task in task_set:#{'SimpleCrossingS9N1'}:
     for seed in {1,2,3,4}:
         cmd_line = f"CUDA_VISIBLE_DEVICES={gpu_id_list} python3 -m scripts.train --algo a2c --env MiniGrid-{task}-v0 --model {task+'_'+time_flag}/MiniGrid-{task}-v0-nextsentksg-{seed} " \
