@@ -12,6 +12,7 @@ from model import ACModel
 
 import numpy as np
 
+import babyai
 # Parse arguments
 
 parser = argparse.ArgumentParser()
