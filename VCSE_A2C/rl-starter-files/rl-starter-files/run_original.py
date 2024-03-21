@@ -18,7 +18,7 @@ task_type = "BabyAI"
 
 for task in task_set:#{'SimpleCrossingS9N1'}:
     for seed in {1,2,3,4}:
-        cmd_line = f"CUDA_VISIBLE_DEVICES={gpu_id_list} python3 -m scripts.train --algo a2c --env {task_type}-{task}-v0 --model {task+'_'+time_flag}/MiniGrid-{task}-v0-original-{seed} " \
+        cmd_line = f"CUDA_VISIBLE_DEVICES={gpu_id_list} python3 -m scripts.train --algo a2c --env {task_type}-{task}-v0 --model {task+'_'+time_flag}/{task_type}-{task}-v0-original-{seed} " \
                    f"--save-interval 100 --frames 2000000 --seed {seed} --use_batch"
         print(cmd_line)
         os.system(cmd_line)
