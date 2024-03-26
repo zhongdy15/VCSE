@@ -73,7 +73,7 @@ class A2CAlgo(BaseAlgo):
                         value_dist = value_dist.reshape(-1)
                         value_dist = self.layerNorm(value_dist)
                         value_dist = value_dist.reshape(-1, 1)
-                        s_ent = self.compute_value_condition_state_entropy(src_feats[:, :, 0, 0], tgt_feats, value_dist,
+                        s_ent = self.compute_value_condition_state_entropy_for_test(src_feats[:, :, 0, 0], tgt_feats, value_dist,
                                                                            average_entropy=False)[:, 0]
                         # we do not normalize intrinsic rewards, but update stats for logging purpose
                         self.s_ent_stats.update(s_ent)
