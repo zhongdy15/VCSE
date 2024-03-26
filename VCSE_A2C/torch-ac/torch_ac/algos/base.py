@@ -512,7 +512,7 @@ class BaseAlgo(ABC):
             n_v = torch.sum(value_dists, dim=1, keepdim=True)  # (b1,1)
             n_s = torch.sum(state_dists, dim=1, keepdim=True)  # (b1,1)
             # reward = torch.digamma(n_v + 1) / ds + torch.log(eps * 2 + 0.00001)
-            reward = torch.log(eps * 2 + 0.00001)
+            reward = torch.digamma(n_v + 1) / ds
         return reward
     
 class TorchRunningMeanStd:
