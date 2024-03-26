@@ -472,6 +472,47 @@ class BaseAlgo(ABC):
             n_s = torch.sum(state_dists,dim=1,keepdim = True) # (b1,1)
             reward = torch.digamma(n_v+1) / ds + torch.log(eps * 2 + 0.00001)
         return reward
+
+    def compute_value_condition_state_entropy(self, src_feats, tgt_feats, value, average_entropy=False):
+        with torch.no_grad():
+            dists = []
+            state_dists = []
+            value_dists = []
+            ds = src_feats.size(1)
+            for idx in range(len(tgt_feats) // 10000 + 1):
+                start = idx * 10000
+                end = (idx + 1) * 10000
+                # 这儿计算出来的是src_feats * tgt_feats的矩阵，每一个代表一个距离
+                state_dist = torch.norm(
+                    src_feats[:, None, :] - tgt_feats[None, start:end, :], dim=-1, p=2
+                )
+                state_dists.append(state_dist)
+                # 这儿计算出来的是src_feats * tgt_feats的矩阵，每一个代表一个距离
+                value_dist = torch.norm(
+                    value[:, None, :] - value[None, start:end, :], dim=-1, p=2
+                )
+                value_dists.append(value_dist)
+                dist = torch.max(torch.cat((state_dist.unsqueeze(-1), value_dist.unsqueeze(-1)), dim=-1), dim=-1)[0]
+                dists.append(dist)
+
+            dists = torch.cat(dists, dim=1)
+            value_dists = torch.cat(value_dists, dim=1)
+            state_dists = torch.cat(state_dists, dim=1)
+            eps = 0.0
+            if average_entropy:
+                for k in range(5):
+                    eps += torch.kthvalue(dists, k + 1, dim=1).values
+                eps /= 5
+            else:
+                eps = torch.kthvalue(dists, k=self.k + 1, dim=1).values
+            # eps 代表b1个点每个的kth距离
+            eps = eps.reshape(-1, 1)  # (b1, 1)
+            value_dists = value_dists < eps
+            state_dists = state_dists <= eps
+            n_v = torch.sum(value_dists, dim=1, keepdim=True)  # (b1,1)
+            n_s = torch.sum(state_dists, dim=1, keepdim=True)  # (b1,1)
+            reward = torch.digamma(n_v + 1) / ds + torch.log(eps * 2 + 0.00001)
+        return reward
     
 class TorchRunningMeanStd:
     def __init__(self, epsilon=1e-4, shape=(), device=None):
