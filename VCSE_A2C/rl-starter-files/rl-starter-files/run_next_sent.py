@@ -13,8 +13,8 @@ task_set = {"DistShift2","RedBlueDoors-8x8"}
 
 task_type = "MiniGrid"
 
-gpu_id_list = 1
-task_set = {"GoToLocal","GoToRedBall"}
+gpu_id_list = 5
+task_set = {"PutNextLocal","PickupLoc"}
 task_type = "BabyAI"
 
 for task in task_set:#{'SimpleCrossingS9N1'}:
